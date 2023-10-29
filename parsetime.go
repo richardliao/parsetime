@@ -90,12 +90,12 @@ func parse(s []byte) (time.Time, error) {
 	}
 
 	// tzH, tzM
-	if tzH == -1 || tzM == -1 {
+	{
 		if s[tzIdx] != '+' && s[tzIdx] != '-' {
 			return time.Time{}, errParse
 		}
 
-		tzH = atoi2MinMax(s[tzIdx+1:tzIdx+3], 0, 23)
+		tzH = atoi2MinMax(s[tzIdx+1:tzIdx+3], 0, 14)
 
 		tzmIdx := 3
 		if s[tzIdx+3] == ':' {
@@ -123,12 +123,13 @@ func parse(s []byte) (time.Time, error) {
 
 	tzOffset = tzSign * (tzH*3600 + tzM*60)
 
-	t := time.Date(year, time.Month(month), day, hour, min, sec, nsec, time.Local)
+	t := time.Date(year, time.Month(month), day, hour, min, sec, nsec, time.UTC)
 	t = t.Add(-time.Duration(tzOffset) * time.Second)
 	return t, nil
 }
 
 func atoi2MinMax(s []byte, min, max int) (x int) {
+	_ = s[1]
 	a0, a1 := int(s[0]-'0'), int(s[1]-'0')
 	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
 		return -1
