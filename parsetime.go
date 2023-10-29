@@ -18,31 +18,17 @@ func Parse(s string) (time.Time, error) {
 
 func parse(s []byte) (time.Time, error) {
 	ok := true
-	parseUint := func(s []byte, min, max int) (x int) {
-		for _, c := range []byte(s) {
-			if c < '0' || '9' < c {
-				ok = false
-				return min
-			}
-			x = x*10 + int(c) - '0'
-		}
-		if x < min || max < x {
-			ok = false
-			return min
-		}
-		return x
-	}
 
 	// Parse the date and time.
 	if len(s) < len("2006-01-02T15:04:05") {
 		return time.Time{}, errParse
 	}
-	year := parseUint(s[0:4], 0, 9999)                            // e.g., 2006
-	month := parseUint(s[5:7], 1, 12)                             // e.g., 01
-	day := parseUint(s[8:10], 1, daysIn(time.Month(month), year)) // e.g., 02
-	hour := parseUint(s[11:13], 0, 23)                            // e.g., 15
-	min := parseUint(s[14:16], 0, 59)                             // e.g., 04
-	sec := parseUint(s[17:19], 0, 59)                             // e.g., 05
+	year := atoi4(s[0:4])                                           // e.g., 2006
+	month := atoi2MinMax(s[5:7], 1, 12)                             // e.g., 01
+	day := atoi2MinMax(s[8:10], 1, daysIn(time.Month(month), year)) // e.g., 02
+	hour := atoi2MinMax(s[11:13], 0, 23)                            // e.g., 15
+	min := atoi2MinMax(s[14:16], 0, 59)                             // e.g., 04
+	sec := atoi2MinMax(s[17:19], 0, 59)                             // e.g., 05
 	if !ok || !(s[4] == '-' && s[7] == '-' && s[10] == 'T' && s[13] == ':' && s[16] == ':') {
 		return time.Time{}, errParse
 	}
@@ -64,8 +50,8 @@ func parse(s []byte) (time.Time, error) {
 		if len(s) != len("-07:00") {
 			return time.Time{}, errParse
 		}
-		hr := parseUint(s[1:3], 0, 23) // e.g., 07
-		mm := parseUint(s[4:6], 0, 59) // e.g., 00
+		hr := atoi2MinMax(s[1:3], 0, 23) // e.g., 07
+		mm := atoi2MinMax(s[4:6], 0, 59) // e.g., 00
 		if !ok || !((s[0] == '-' || s[0] == '+') && s[3] == ':') {
 			return time.Time{}, errParse
 		}
@@ -77,6 +63,27 @@ func parse(s []byte) (time.Time, error) {
 		t = t.Add(-time.Duration(zoneOffset) * time.Second)
 	}
 	return t, nil
+}
+
+func atoi2MinMax(s []byte, min, max int) (x int) {
+	a0, a1 := int(s[0]-'0'), int(s[1]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
+		return -1
+	}
+	x = a0*1e1 + a1
+	if x < min || max < x {
+		return -1
+	}
+	return x
+}
+
+func atoi4(s []byte) (x int) {
+	a0, a1, a2, a3 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 {
+		return -1
+	}
+	x = a0*1e3 + a1*1e2 + a2*1e1 + a3
+	return x
 }
 
 // The following code is almost from the stdlib time.
