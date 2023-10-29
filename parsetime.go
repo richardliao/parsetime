@@ -40,8 +40,24 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 		return time.Time{}, errParse
 	}
 
+	// Days since epoc.
+	var daysEpoc uint64
+	var leap bool
+
+	if year >= unixEpoc && year < unixEpoc+cacheYears {
+		daysEpoc = yearDays[year-unixEpoc] + uint64(daysBefore[month-1]) + uint64(day-1)
+		leap = yearLeap[year-unixEpoc]
+	} else {
+		daysEpoc = daysSinceEpoch(year)
+		leap = isLeap(year)
+	}
+
+	if leap && month >= 3 {
+		daysEpoc++
+	}
+
 	if sLen == 10 {
-		unix = toUnixUTC(year, time.Month(month), day, 0, 0, 0)
+		unix = int64(daysEpoc*secondsPerDay) + (absoluteToInternal + internalToUnix)
 		return time.Unix(unix-int64(locOffset), 0), nil
 	}
 
@@ -174,29 +190,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 
 	if sLen == 0 || sLen == tzIdx {
 		// No tz information.
-		{
-			// inline toUnixUTC
-			y := uint64(int64(year) - absoluteZeroYear)
-			n := y / 400
-			y -= 400 * n
-			d := daysPer400Years * n
-			n = y / 100
-			y -= 100 * n
-			d += daysPer100Years * n
-			n = y / 4
-			y -= 4 * n
-			d += daysPer4Years * n
-			n = y
-			d += 365 * n
-			d += uint64(daysBefore[month-1])
-			if (year%4 == 0 && (year%100 != 0 || year%400 == 0)) && month >= 3 {
-				d++
-			}
-			d += uint64(day - 1)
-			abs := d * secondsPerDay
-			abs += uint64(hour*secondsPerHour + min*secondsPerMinute + sec)
-			unix = int64(abs) + (absoluteToInternal + internalToUnix)
-		}
+		unix = int64(daysEpoc*secondsPerDay+uint64(hour*secondsPerHour+min*secondsPerMinute+sec)) + (absoluteToInternal + internalToUnix)
 		return time.Unix(unix-int64(locOffset), int64(nsec)), nil
 	}
 
@@ -254,29 +248,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 
 	tzOffset = tzSign * (tzH*3600 + tzM*60)
 
-	{
-		// inline toUnixUTC
-		y := uint64(int64(year) - absoluteZeroYear)
-		n := y / 400
-		y -= 400 * n
-		d := daysPer400Years * n
-		n = y / 100
-		y -= 100 * n
-		d += daysPer100Years * n
-		n = y / 4
-		y -= 4 * n
-		d += daysPer4Years * n
-		n = y
-		d += 365 * n
-		d += uint64(daysBefore[month-1])
-		if (year%4 == 0 && (year%100 != 0 || year%400 == 0)) && month >= 3 {
-			d++
-		}
-		d += uint64(day - 1)
-		abs := d * secondsPerDay
-		abs += uint64(hour*secondsPerHour + min*secondsPerMinute + sec)
-		unix = int64(abs) + (absoluteToInternal + internalToUnix)
-	}
+	unix = int64(daysEpoc*secondsPerDay+uint64(hour*secondsPerHour+min*secondsPerMinute+sec)) + (absoluteToInternal + internalToUnix)
 	return time.Unix(unix-int64(tzOffset), int64(nsec)), nil
 }
 
@@ -291,28 +263,6 @@ func atoi2MinMax(s []byte, min, max int) (x int) {
 		return -1
 	}
 	return x
-}
-
-func toUnixUTC(year int, month time.Month, day, hour, min, sec int) int64 {
-	// Compute days since the absolute epoch.
-	d := daysSinceEpoch(year)
-
-	// Add in days before this month.
-	d += uint64(daysBefore[month-1])
-	if isLeap(year) && month >= time.March {
-		d++ // February 29
-	}
-
-	// Add in days before today.
-	d += uint64(day - 1)
-
-	// Add in time elapsed today.
-	abs := d * secondsPerDay
-	abs += uint64(hour*secondsPerHour + min*secondsPerMinute + sec)
-
-	unix := int64(abs) + (absoluteToInternal + internalToUnix)
-
-	return unix
 }
 
 // The following code is from the stdlib time.
@@ -397,4 +347,22 @@ func daysIn(m time.Month, year int) int {
 		return 29
 	}
 	return int(daysBefore[m] - daysBefore[m-1])
+}
+
+// Cache between 1970 and 2069.
+const (
+	unixEpoc   = 1970
+	cacheYears = 100
+)
+
+var (
+	yearDays = [cacheYears]uint64{}
+	yearLeap = [cacheYears]bool{}
+)
+
+func init() {
+	for i := 0; i < cacheYears; i++ {
+		yearDays[i] = daysSinceEpoch(unixEpoc + i)
+		yearLeap[i] = isLeap(unixEpoc + i)
+	}
 }
