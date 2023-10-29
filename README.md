@@ -7,3 +7,12 @@ The time string generated in many languages is not the standard RFC3339, but a v
 When it is not a standard RFC3339 string (e.g. 2006-01-02T15:04:05.999), 
 or multiple uncertain time formats need to be tried, 
 the resources consumed by the parsing time are very considerable.
+
+
+```
+// parsetime
+BenchmarkRFC3339Nano    45444333                77.03 ns/op
+
+// stdlib
+BenchmarkGoRFC3339Nano  46605316                77.15 ns/op
+```
