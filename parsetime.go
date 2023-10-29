@@ -90,12 +90,33 @@ func parse(s []byte) (time.Time, error) {
 	}
 
 	// tzH, tzM
-	{
+	switch {
+	case s[sLen-3] == ':':
+		if s[sLen-6] == '+' || s[sLen-6] == '-' {
+			tzH = atoi2MinMax(s[sLen-5:sLen-3], 0, 23)
+			tzM = atoi2MinMax(s[sLen-2:sLen], 0, 59)
+		}
+	case s[sLen-4] == '+' || s[sLen-4] == '-':
+		tzH = atoi2MinMax(s[sLen-4:sLen-2], 0, 23)
+		tzM = atoi2MinMax(s[sLen-2:sLen], 0, 59)
+	case s[sLen-2] == '+' || s[sLen-2] == '-':
+		tzH = atoi2MinMax(s[sLen-2:sLen], 0, 23)
+		tzM = 0
+	case s[sLen-1] == 'z' || s[sLen-1] == 'Z':
+		tzH = 0
+		tzM = 0
+	default:
+		tzH = -1
+		tzM = -1
+	}
+
+	// fallback
+	if tzH == -1 || tzM == -1 {
 		if s[tzIdx] != '+' && s[tzIdx] != '-' {
 			return time.Time{}, errParse
 		}
 
-		tzH = atoi2MinMax(s[tzIdx+1:tzIdx+3], 0, 14)
+		tzH = atoi2MinMax(s[tzIdx+1:tzIdx+3], 0, 23)
 
 		tzmIdx := 3
 		if s[tzIdx+3] == ':' {
