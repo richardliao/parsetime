@@ -23,7 +23,14 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 		return time.Time{}, errParse
 	}
 
-	year := atoi4(s[0:4])
+	var unix int64
+	var a0, a1, a2, a3, a4, a5, a6, a7, a8 int
+
+	a0, a1, a2, a3 = int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 {
+		return time.Time{}, errParse
+	}
+	year := a0*1e3 + a1*1e2 + a2*1e1 + a3
 	month := atoi2MinMax(s[5:7], 1, 12)
 	if year == -1 || month == -1 {
 		return time.Time{}, errParse
@@ -34,8 +41,8 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 	}
 
 	if sLen == 10 {
-		unix := toUnixUTC(year, time.Month(month), day, 0, 0, 0) - int64(locOffset)
-		return time.Unix(unix, 0), nil
+		unix = toUnixUTC(year, time.Month(month), day, 0, 0, 0)
+		return time.Unix(unix-int64(locOffset), 0), nil
 	}
 
 	if sLen < 19 || s[13] != ':' || s[16] != ':' || s[10] != 'T' && s[10] != ' ' {
@@ -61,32 +68,81 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 			// Try fast path.
 			switch {
 			case sLen > 4 && (s[4] == '+' || s[4] == '-' || s[4] == 'z' || s[4] == 'Z'):
-				nsec = atoi3(s[1:4]) * 1e6
-				tzIdx = 4
+				a0, a1, a2 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0*1e2 + a1*1e1 + a2) * 1e6
+					tzIdx = 4
+				}
 			case sLen > 7 && (s[7] == '+' || s[7] == '-' || s[7] == 'z' || s[7] == 'Z'):
-				nsec = atoi6(s[1:7]) * 1e3
-				tzIdx = 7
+				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+				a5 = int(s[6] - '0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0*1e5 + a1*1e4 + a2*1e3 + a3*1e2 + a4*1e1 + a5) * 1e3
+					tzIdx = 7
+				}
 			case sLen > 10 && (s[10] == '+' || s[10] == '-' || s[10] == 'z' || s[10] == 'Z'):
-				nsec = atoi9(s[1:10])
-				tzIdx = 10
+				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+				a5, a6, a7, a8 = int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0'), int(s[9]-'0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 || a8 < 0 || a8 > 9 {
+					nsec = -1
+				} else {
+					nsec = a0*1e8 + a1*1e7 + a2*1e6 + a3*1e5 + a4*1e4 + a5*1e3 + a6*1e2 + a7*1e1 + a8
+					tzIdx = 10
+				}
 			case sLen > 2 && (s[2] == '+' || s[2] == '-' || s[2] == 'z' || s[2] == 'Z'):
-				nsec = atoi1(s[1:2]) * 1e8
-				tzIdx = 2
+				a0 = int(s[1] - '0')
+				if a0 < 0 || a0 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0) * 1e8
+					tzIdx = 2
+				}
 			case sLen > 3 && (s[3] == '+' || s[3] == '-' || s[3] == 'z' || s[3] == 'Z'):
-				nsec = atoi2(s[1:3]) * 1e7
-				tzIdx = 3
+				a0, a1 = int(s[1]-'0'), int(s[2]-'0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0*1e1 + a1) * 1e7
+					tzIdx = 3
+				}
 			case sLen > 5 && (s[5] == '+' || s[5] == '-' || s[5] == 'z' || s[5] == 'Z'):
-				nsec = atoi4(s[1:5]) * 1e5
-				tzIdx = 5
+				a0, a1, a2, a3 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0*1e3 + a1*1e2 + a2*1e1 + a3) * 1e5
+					tzIdx = 5
+				}
 			case sLen > 6 && (s[6] == '+' || s[6] == '-' || s[6] == 'z' || s[6] == 'Z'):
-				nsec = atoi5(s[1:6]) * 1e4
-				tzIdx = 6
+				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0*1e4 + a1*1e3 + a2*1e2 + a3*1e1 + a4) * 1e4
+					tzIdx = 6
+				}
 			case sLen > 8 && (s[8] == '+' || s[8] == '-' || s[8] == 'z' || s[8] == 'Z'):
-				nsec = atoi7(s[1:8]) * 1e2
-				tzIdx = 8
+				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+				a5, a6 = int(s[6]-'0'), int(s[7]-'0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0*1e6 + a1*1e5 + a2*1e4 + a3*1e3 + a4*1e2 + a5*1e1 + a6) * 1e2
+					tzIdx = 8
+				}
 			case sLen > 9 && (s[9] == '+' || s[9] == '-' || s[9] == 'z' || s[9] == 'Z'):
-				nsec = atoi8(s[1:9]) * 1e1
-				tzIdx = 9
+				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+				a5, a6, a7 = int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0')
+				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 {
+					nsec = -1
+				} else {
+					nsec = (a0*1e7 + a1*1e6 + a2*1e5 + a3*1e4 + a4*1e3 + a5*1e2 + a6*1e1 + a7) * 1e1
+					tzIdx = 9
+				}
 			default:
 				nsec = -1
 			}
@@ -118,8 +174,30 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 
 	if sLen == 0 || sLen == tzIdx {
 		// No tz information.
-		unix := toUnixUTC(year, time.Month(month), day, hour, min, sec) - int64(locOffset)
-		return time.Unix(unix, int64(nsec)), nil
+		{
+			// inline toUnixUTC
+			y := uint64(int64(year) - absoluteZeroYear)
+			n := y / 400
+			y -= 400 * n
+			d := daysPer400Years * n
+			n = y / 100
+			y -= 100 * n
+			d += daysPer100Years * n
+			n = y / 4
+			y -= 4 * n
+			d += daysPer4Years * n
+			n = y
+			d += 365 * n
+			d += uint64(daysBefore[month-1])
+			if (year%4 == 0 && (year%100 != 0 || year%400 == 0)) && month >= 3 {
+				d++
+			}
+			d += uint64(day - 1)
+			abs := d * secondsPerDay
+			abs += uint64(hour*secondsPerHour + min*secondsPerMinute + sec)
+			unix = int64(abs) + (absoluteToInternal + internalToUnix)
+		}
+		return time.Unix(unix-int64(locOffset), int64(nsec)), nil
 	}
 
 	// Timezone sign.
@@ -176,8 +254,43 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 
 	tzOffset = tzSign * (tzH*3600 + tzM*60)
 
-	unix := toUnixUTC(year, time.Month(month), day, hour, min, sec) - int64(tzOffset)
-	return time.Unix(unix, int64(nsec)), nil
+	{
+		// inline toUnixUTC
+		y := uint64(int64(year) - absoluteZeroYear)
+		n := y / 400
+		y -= 400 * n
+		d := daysPer400Years * n
+		n = y / 100
+		y -= 100 * n
+		d += daysPer100Years * n
+		n = y / 4
+		y -= 4 * n
+		d += daysPer4Years * n
+		n = y
+		d += 365 * n
+		d += uint64(daysBefore[month-1])
+		if (year%4 == 0 && (year%100 != 0 || year%400 == 0)) && month >= 3 {
+			d++
+		}
+		d += uint64(day - 1)
+		abs := d * secondsPerDay
+		abs += uint64(hour*secondsPerHour + min*secondsPerMinute + sec)
+		unix = int64(abs) + (absoluteToInternal + internalToUnix)
+	}
+	return time.Unix(unix-int64(tzOffset), int64(nsec)), nil
+}
+
+func atoi2MinMax(s []byte, min, max int) (x int) {
+	_ = s[1]
+	a0, a1 := int(s[0]-'0'), int(s[1]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
+		return -1
+	}
+	x = a0*1e1 + a1
+	if x < min || max < x {
+		return -1
+	}
+	return x
 }
 
 func toUnixUTC(year int, month time.Month, day, hour, min, sec int) int64 {
@@ -202,226 +315,7 @@ func toUnixUTC(year int, month time.Month, day, hour, min, sec int) int64 {
 	return unix
 }
 
-func atoi2MinMax(s []byte, min, max int) (x int) {
-	_ = s[1]
-	a0, a1 := int(s[0]-'0'), int(s[1]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
-		return -1
-	}
-	x = a0*1e1 + a1
-	if x < min || max < x {
-		return -1
-	}
-	return x
-}
-
-func atoi1(s []byte) (x int) {
-	_ = s[0]
-	a0 := int(s[0] - '0')
-	if a0 < 0 || a0 > 9 {
-		return -1
-	}
-	return a0 * 1
-}
-
-func atoi2(s []byte) (x int) {
-	_ = s[1]
-	a0, a1 := int(s[0]-'0'), int(s[1]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
-		return -1
-	}
-	return a0*1e1 + a1*1
-}
-
-func atoi3(s []byte) (x int) {
-	_ = s[2]
-	a0, a1, a2 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 {
-		return -1
-	}
-	return a0*1e2 + a1*1e1 + a2*1
-}
-
-func atoi4(s []byte) (x int) {
-	_ = s[3]
-	a0, a1, a2, a3 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 {
-		return -1
-	}
-	return a0*1e3 + a1*1e2 + a2*1e1 + a3*1
-}
-
-func atoi5(s []byte) (x int) {
-	_ = s[4]
-	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
-		return -1
-	}
-
-	return a0*1e4 + a1*1e3 + a2*1e2 + a3*1e1 + a4*1
-}
-
-func atoi6(s []byte) (x int) {
-	_ = s[5]
-	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
-		return -1
-	}
-	a5 := int(s[5] - '0')
-	if a5 < 0 || a5 > 9 {
-		return -1
-	}
-
-	return a0*1e5 + a1*1e4 + a2*1e3 + a3*1e2 + a4*1e1 + a5*1
-}
-
-func atoi7(s []byte) (x int) {
-	_ = s[6]
-	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
-		return -1
-	}
-	a5, a6 := int(s[5]-'0'), int(s[6]-'0')
-	if a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 {
-		return -1
-	}
-
-	return a0*1e6 + a1*1e5 + a2*1e4 + a3*1e3 + a4*1e2 + a5*1e1 + a6*1
-}
-
-func atoi8(s []byte) (x int) {
-	_ = s[7]
-	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
-		return -1
-	}
-	a5, a6, a7 := int(s[5]-'0'), int(s[6]-'0'), int(s[7]-'0')
-	if a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 {
-		return -1
-	}
-
-	return a0*1e7 + a1*1e6 + a2*1e5 + a3*1e4 + a4*1e3 + a5*1e2 + a6*1e1 + a7*1
-}
-
-func atoi9(s []byte) (x int) {
-	_ = s[8]
-	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
-		return -1
-	}
-	a5, a6, a7, a8 := int(s[5]-'0'), int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0')
-	if a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 || a8 < 0 || a8 > 9 {
-		return -1
-	}
-
-	return a0*1e8 + a1*1e7 + a2*1e6 + a3*1e5 + a4*1e4 + a5*1e3 + a6*1e2 + a7*1e1 + a8*1
-}
-
-// The following code is almost from the stdlib time.
-
-func isDigit(s []byte, i int) bool {
-	if len(s) <= i {
-		return false
-	}
-	c := s[i]
-	return '0' <= c && c <= '9'
-}
-
-func parseNanoseconds(value []byte, nbytes int) (ns int, rangeErrString string, err error) {
-	if !commaOrPeriod(value[0]) {
-		err = errParse
-		return
-	}
-	if nbytes > 10 {
-		value = value[:10]
-		nbytes = 10
-	}
-	if ns, err = atoi(value[1:nbytes]); err != nil {
-		return
-	}
-	if ns < 0 {
-		rangeErrString = "fractional second"
-		return
-	}
-	// We need nanoseconds, which means scaling by the number
-	// of missing digits in the format, maximum length 10.
-	scaleDigits := 10 - nbytes
-	for i := 0; i < scaleDigits; i++ {
-		ns *= 10
-	}
-	return
-}
-
-func commaOrPeriod(b byte) bool {
-	return b == '.' || b == ','
-}
-
-func atoi(s []byte) (x int, err error) {
-	neg := false
-	if len(s) > 0 && (s[0] == '-' || s[0] == '+') {
-		neg = s[0] == '-'
-		s = s[1:]
-	}
-	q, rem, err := leadingInt(s)
-	x = int(q)
-	if err != nil || len(rem) > 0 {
-		return 0, errParse
-	}
-	if neg {
-		x = -x
-	}
-	return x, nil
-}
-
-func leadingInt(s []byte) (x uint64, rem []byte, err error) {
-	i := 0
-	for ; i < len(s); i++ {
-		c := s[i]
-		if c < '0' || c > '9' {
-			break
-		}
-		if x > 1<<63/10 {
-			// overflow
-			return 0, rem, errParse
-		}
-		x = x*10 + uint64(c) - '0'
-		if x > 1<<63 {
-			// overflow
-			return 0, rem, errParse
-		}
-	}
-	return x, s[i:], nil
-}
-
-func daysIn(m time.Month, year int) int {
-	if m == time.February && isLeap(year) {
-		return 29
-	}
-	return int(daysBefore[m] - daysBefore[m-1])
-}
-
-func isLeap(year int) bool {
-	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
-}
-
-// daysBefore[m] counts the number of days in a non-leap year
-// before month m begins. There is an entry for m=12, counting
-// the number of days before January of next year (365).
-var daysBefore = [...]int32{
-	0,
-	31,
-	31 + 28,
-	31 + 28 + 31,
-	31 + 28 + 31 + 30,
-	31 + 28 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
-}
+// The following code is from the stdlib time.
 
 const (
 	secondsPerMinute = 60
@@ -443,7 +337,7 @@ const (
 	// Assumed by the unixToInternal computation below.
 	internalYear = 1
 
-	// Offsets to convert between internal and absolute or toUnix times.
+	// Offsets to convert between internal and absolute or toUnixUTC times.
 	absoluteToInternal int64 = (absoluteZeroYear - internalYear) * 365.2425 * secondsPerDay
 	internalToAbsolute       = -absoluteToInternal
 
@@ -476,4 +370,31 @@ func daysSinceEpoch(year int) uint64 {
 	d += 365 * n
 
 	return d
+}
+
+var daysBefore = [...]int32{
+	0,
+	31,
+	31 + 28,
+	31 + 28 + 31,
+	31 + 28 + 31 + 30,
+	31 + 28 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
+}
+
+func isLeap(year int) bool {
+	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
+}
+
+func daysIn(m time.Month, year int) int {
+	if m == time.February && isLeap(year) {
+		return 29
+	}
+	return int(daysBefore[m] - daysBefore[m-1])
 }

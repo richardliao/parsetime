@@ -11,8 +11,8 @@ the resources consumed by the parsing time are very considerable.
 
 ```
 // parsetime
-BenchmarkRFC3339Nano    84759276                41.34 ns/op
+BenchmarkRFC3339Nano    98137472                35.63 ns/op
 
 // stdlib
-BenchmarkGoRFC3339Nano  47227040                78.60 ns/op
+BenchmarkGoRFC3339Nano  43621560                79.97 ns/op
 ```
