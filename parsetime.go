@@ -7,6 +7,26 @@ import (
 
 var errParse = errors.New("could not parse time")
 
+// ParseInLocation is like time.ParseInLocation.
+//
+// The result is the given location.
+// In the absence of time zone information,
+// ParseInLocation interprets the time as in the given location.
+//
+// The parameter locOffset is added for performance, and its value is the offset corresponding to loc.
+//
+// For example.
+//
+// _, locOffset := time.Now().In(loc).Zone()
+func ParseInLocation(s string, loc *time.Location, locOffset int) (time.Time, error) {
+	t, err := parse([]byte(s), locOffset)
+	if err != nil {
+		return time.Time{}, nil
+	}
+
+	return t.In(loc), nil
+}
+
 // Parse is like time.Parse.
 //
 // The result is the Local location.
@@ -14,6 +34,21 @@ var errParse = errors.New("could not parse time")
 // Parse interprets the time as in UTC.
 func Parse(s string) (time.Time, error) {
 	return parse([]byte(s), 0)
+}
+
+// ParseBytesInLocation is like time.ParseInLocation but accepting bytes with better performance of about 4 ns.
+func ParseBytesInLocation(s []byte, loc *time.Location, locOffset int) (time.Time, error) {
+	t, err := parse(s, locOffset)
+	if err != nil {
+		return time.Time{}, nil
+	}
+
+	return t.In(loc), nil
+}
+
+// ParseBytes is like time.Parse but accepting bytes with better performance of about 4 ns.
+func ParseBytes(s []byte) (time.Time, error) {
+	return parse(s, 0)
 }
 
 func parse(s []byte, locOffset int) (time.Time, error) {
