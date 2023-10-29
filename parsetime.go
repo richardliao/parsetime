@@ -17,136 +17,180 @@ func Parse(s string) (time.Time, error) {
 }
 
 func parse(s []byte) (time.Time, error) {
-	if len(s) < 19 || s[4] != '-' || s[7] != '-' || s[13] != ':' || s[16] != ':' || s[10] != 'T' && s[10] != ' ' {
+	sLen := len(s)
+
+	if sLen < 10 || s[4] != '-' || s[7] != '-' {
 		return time.Time{}, errParse
 	}
-
-	var nsec, tzSign, tzH, tzM, tzIdx, tzOffset int
-
-	sLen := len(s)
 
 	year := atoi4(s[0:4])
 	month := atoi2MinMax(s[5:7], 1, 12)
+	if year == -1 || month == -1 {
+		return time.Time{}, errParse
+	}
 	day := atoi2MinMax(s[8:10], 1, daysIn(time.Month(month), year))
-	hour := atoi2MinMax(s[11:13], 0, 23)
-	min := atoi2MinMax(s[14:16], 0, 59)
-	sec := atoi2MinMax(s[17:19], 0, 59)
-	if year == -1 || month == -1 || day == -1 || hour == -1 || min == -1 || sec == -1 {
+	if day == -1 {
 		return time.Time{}, errParse
 	}
 
+	if sLen == 10 {
+		unix := toUnix(year, time.Month(month), day, 0, 0, 0)
+		return time.Unix(unix, 0), nil
+	}
+
+	if sLen < 19 || s[13] != ':' || s[16] != ':' || s[10] != 'T' && s[10] != ' ' {
+		return time.Time{}, errParse
+	}
+
+	hour := atoi2MinMax(s[11:13], 0, 23)
+	min := atoi2MinMax(s[14:16], 0, 59)
+	sec := atoi2MinMax(s[17:19], 0, 59)
+	if hour == -1 || min == -1 || sec == -1 {
+		return time.Time{}, errParse
+	}
+
+	var nsec, tzSign, tzH, tzM, tzIdx, tz int
+
 	// nsec
 	tzIdx = 19
-	if sLen > 20 && (s[19] == '.' || s[19] == ',') {
-		// fast path
-		switch {
-		case sLen > 22 && (s[23] == '+' || s[23] == '-' || s[23] == 'z' || s[23] == 'Z'):
-			nsec = atoi3(s[20:23]) * 1e6
-			tzIdx = 23
-		case sLen > 25 && (s[26] == '+' || s[26] == '-' || s[26] == 'z' || s[26] == 'Z'):
-			nsec = atoi6(s[20:26]) * 1e3
-			tzIdx = 26
-		case sLen > 28 && (s[29] == '+' || s[29] == '-' || s[29] == 'z' || s[29] == 'Z'):
-			nsec = atoi9(s[20:29])
-			tzIdx = 29
-		case sLen > 20 && (s[21] == '+' || s[21] == '-' || s[21] == 'z' || s[21] == 'Z'):
-			nsec = atoi1(s[20:21]) * 1e8
-			tzIdx = 21
-		case sLen > 21 && (s[22] == '+' || s[22] == '-' || s[22] == 'z' || s[22] == 'Z'):
-			nsec = atoi2(s[20:22]) * 1e6
-			tzIdx = 22
-		case sLen > 23 && (s[24] == '+' || s[24] == '-' || s[24] == 'z' || s[24] == 'Z'):
-			nsec = atoi4(s[20:24]) * 1e5
-			tzIdx = 24
-		case sLen > 24 && (s[25] == '+' || s[25] == '-' || s[25] == 'z' || s[25] == 'Z'):
-			nsec = atoi5(s[20:25]) * 1e4
-			tzIdx = 25
-		case sLen > 26 && (s[27] == '+' || s[27] == '-' || s[27] == 'z' || s[27] == 'Z'):
-			nsec = atoi7(s[20:27]) * 1e2
-			tzIdx = 27
-		case sLen > 27 && (s[28] == '+' || s[28] == '-' || s[28] == 'z' || s[28] == 'Z'):
-			nsec = atoi8(s[20:28]) * 1e1
-			tzIdx = 28
-		default:
-			nsec = -1
-		}
-
-		// fallback
-		if nsec == -1 && '0' <= s[20] && s[20] <= '9' {
-			var val int
-			var c byte
-			var mult int = 1e9
-			for tzIdx = 20; tzIdx < sLen; tzIdx++ {
-				c = s[tzIdx]
-				if c >= '0' && c <= '9' {
-					val = val*10 + int(c-'0')
-					mult /= 10
-				} else {
-					break
-				}
+	if sLen > 20 {
+		if s[19] == '.' || s[19] == ',' {
+			// fast path
+			switch {
+			case sLen > 23 && (s[23] == '+' || s[23] == '-' || s[23] == 'z' || s[23] == 'Z'):
+				nsec = atoi3(s[20:23]) * 1e6
+				tzIdx = 23
+			case sLen > 26 && (s[26] == '+' || s[26] == '-' || s[26] == 'z' || s[26] == 'Z'):
+				nsec = atoi6(s[20:26]) * 1e3
+				tzIdx = 26
+			case sLen > 29 && (s[29] == '+' || s[29] == '-' || s[29] == 'z' || s[29] == 'Z'):
+				nsec = atoi9(s[20:29])
+				tzIdx = 29
+			case sLen > 21 && (s[21] == '+' || s[21] == '-' || s[21] == 'z' || s[21] == 'Z'):
+				nsec = atoi1(s[20:21]) * 1e8
+				tzIdx = 21
+			case sLen > 22 && (s[22] == '+' || s[22] == '-' || s[22] == 'z' || s[22] == 'Z'):
+				nsec = atoi2(s[20:22]) * 1e7
+				tzIdx = 22
+			case sLen > 24 && (s[24] == '+' || s[24] == '-' || s[24] == 'z' || s[24] == 'Z'):
+				nsec = atoi4(s[20:24]) * 1e5
+				tzIdx = 24
+			case sLen > 25 && (s[25] == '+' || s[25] == '-' || s[25] == 'z' || s[25] == 'Z'):
+				nsec = atoi5(s[20:25]) * 1e4
+				tzIdx = 25
+			case sLen > 27 && (s[27] == '+' || s[27] == '-' || s[27] == 'z' || s[27] == 'Z'):
+				nsec = atoi7(s[20:27]) * 1e2
+				tzIdx = 27
+			case sLen > 28 && (s[28] == '+' || s[28] == '-' || s[28] == 'z' || s[28] == 'Z'):
+				nsec = atoi8(s[20:28]) * 1e1
+				tzIdx = 28
+			default:
+				nsec = -1
 			}
-			nsec = val * mult
-		}
-	}
 
-	// tzH, tzM
-	switch {
-	case s[sLen-3] == ':':
-		if s[sLen-6] == '+' || s[sLen-6] == '-' {
-			tzH = atoi2MinMax(s[sLen-5:sLen-3], 0, 23)
-			tzM = atoi2MinMax(s[sLen-2:sLen], 0, 59)
-		}
-	case s[sLen-4] == '+' || s[sLen-4] == '-':
-		tzH = atoi2MinMax(s[sLen-4:sLen-2], 0, 23)
-		tzM = atoi2MinMax(s[sLen-2:sLen], 0, 59)
-	case s[sLen-2] == '+' || s[sLen-2] == '-':
-		tzH = atoi2MinMax(s[sLen-2:sLen], 0, 23)
-		tzM = 0
-	case s[sLen-1] == 'z' || s[sLen-1] == 'Z':
-		tzH = 0
-		tzM = 0
-	default:
-		tzH = -1
-		tzM = -1
-	}
+			// fallback
+			if nsec < 0 && '0' <= s[20] && s[20] <= '9' {
+				var val int
+				var c byte
+				var mult int = 1e9
+				for tzIdx = 20; tzIdx < sLen; tzIdx++ {
+					if tzIdx > 28 {
+						return time.Time{}, errParse
+					}
 
-	// fallback
-	if tzH == -1 || tzM == -1 {
-		if s[tzIdx] != '+' && s[tzIdx] != '-' {
+					c = s[tzIdx]
+					if c >= '0' && c <= '9' {
+						val = val*10 + int(c-'0')
+						mult /= 10
+					} else {
+						break
+					}
+				}
+				nsec = val * mult
+			}
+		} else if s[19] != 'z' && s[19] != 'Z' && s[19] != '+' && s[19] != '-' {
 			return time.Time{}, errParse
 		}
-
-		tzH = atoi2MinMax(s[tzIdx+1:tzIdx+3], 0, 23)
-
-		tzmIdx := 3
-		if s[tzIdx+3] == ':' {
-			tzmIdx++
-		}
-
-		tzM = atoi2MinMax(s[tzIdx+tzmIdx:tzIdx+tzmIdx+2], 0, 59)
 	}
 
 	// tzSign
 	switch {
-	case s[sLen-6] == '+' || s[sLen-5] == '+':
+	case sLen == 19 || sLen == tzIdx:
 		tzSign = 1
-	case s[sLen-6] == '-' || s[sLen-5] == '-':
+	case s[sLen-1] == 'z' || s[sLen-1] == 'Z' || s[tzIdx] == '+':
+		tzSign = 1
+	case s[tzIdx] == '-':
 		tzSign = -1
-	case s[sLen-1] == 'z' || s[sLen-1] == 'Z':
-		tzSign = 1
 	default:
 		tzSign = 0
 	}
 
-	if nsec == -1 || tzH == -1 || tzM == -1 || tzSign == 0 {
+	// tzH, tzM
+	s = s[tzIdx:]
+	if len(s) > 0 {
+		c := s[0]
+		if c == 'z' || c == 'Z' {
+			tz = 0
+		} else {
+			if c != '+' && c != '-' {
+				return time.Time{}, errParse
+			}
+
+			switch len(s) {
+			case 6:
+				tzH = atoi2MinMax(s[1:3], 0, 14)
+				tzM = atoi2MinMax(s[4:6], 0, 59)
+				if s[3] != ':' {
+					tzH = -1
+					tzM = -1
+				}
+			case 5:
+				tzH = atoi2MinMax(s[1:3], 0, 14)
+				tzM = atoi2MinMax(s[3:5], 0, 59)
+			case 3:
+				tzH = atoi2MinMax(s[1:3], 0, 14)
+				tzM = 0
+			default:
+				tzH = -1
+				tzM = -1
+			}
+		}
+	}
+
+	if nsec < 0 || tzH == -1 || tzM == -1 || tzSign == 0 {
 		return time.Time{}, errParse
 	}
 
-	tzOffset = tzSign * (tzH*3600 + tzM*60)
+	if tzSign == -1 && tzH > 12 {
+		return time.Time{}, errParse
+	}
 
-	t := time.Date(year, time.Month(month), day, hour, min, sec, nsec, time.UTC)
-	t = t.Add(-time.Duration(tzOffset) * time.Second)
-	return t, nil
+	tz = tzSign * (tzH*3600 + tzM*60)
+
+	unix := toUnix(year, time.Month(month), day, hour, min, sec) - int64(tz)
+	return time.Unix(unix, int64(nsec)), nil
+}
+
+func toUnix(year int, month time.Month, day, hour, min, sec int) int64 {
+	// Compute days since the absolute epoch.
+	d := daysSinceEpoch(year)
+
+	// Add in days before this month.
+	d += uint64(daysBefore[month-1])
+	if isLeap(year) && month >= time.March {
+		d++ // February 29
+	}
+
+	// Add in days before today.
+	d += uint64(day - 1)
+
+	// Add in time elapsed today.
+	abs := d * secondsPerDay
+	abs += uint64(hour*secondsPerHour + min*secondsPerMinute + sec)
+
+	unix := int64(abs) + (absoluteToInternal + internalToUnix)
+
+	return unix
 }
 
 func atoi2MinMax(s []byte, min, max int) (x int) {
@@ -368,4 +412,59 @@ var daysBefore = [...]int32{
 	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
 	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
 	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
+}
+
+const (
+	secondsPerMinute = 60
+	secondsPerHour   = 60 * secondsPerMinute
+	secondsPerDay    = 24 * secondsPerHour
+	secondsPerWeek   = 7 * secondsPerDay
+	daysPer400Years  = 365*400 + 97
+	daysPer100Years  = 365*100 + 24
+	daysPer4Years    = 365*4 + 1
+)
+
+const (
+	// The unsigned zero year for internal calculations.
+	// Must be 1 mod 400, and times before it will not compute correctly,
+	// but otherwise can be changed at will.
+	absoluteZeroYear = -292277022399
+
+	// The year of the zero Time.
+	// Assumed by the unixToInternal computation below.
+	internalYear = 1
+
+	// Offsets to convert between internal and absolute or toUnix times.
+	absoluteToInternal int64 = (absoluteZeroYear - internalYear) * 365.2425 * secondsPerDay
+	internalToAbsolute       = -absoluteToInternal
+
+	unixToInternal int64 = (1969*365 + 1969/4 - 1969/100 + 1969/400) * secondsPerDay
+	internalToUnix int64 = -unixToInternal
+
+	wallToInternal int64 = (1884*365 + 1884/4 - 1884/100 + 1884/400) * secondsPerDay
+)
+
+func daysSinceEpoch(year int) uint64 {
+	y := uint64(int64(year) - absoluteZeroYear)
+
+	// Add in days from 400-year cycles.
+	n := y / 400
+	y -= 400 * n
+	d := daysPer400Years * n
+
+	// Add in 100-year cycles.
+	n = y / 100
+	y -= 100 * n
+	d += daysPer100Years * n
+
+	// Add in 4-year cycles.
+	n = y / 4
+	y -= 4 * n
+	d += daysPer4Years * n
+
+	// Add in non-leap years.
+	n = y
+	d += 365 * n
+
+	return d
 }
