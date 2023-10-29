@@ -13,10 +13,10 @@ var errParse = errors.New("could not parse time")
 // In the absence of a time zone information,
 // Parse interprets the time as in UTC.
 func Parse(s string) (time.Time, error) {
-	return parse([]byte(s))
+	return parse([]byte(s), 0)
 }
 
-func parse(s []byte) (time.Time, error) {
+func parse(s []byte, locOffset int) (time.Time, error) {
 	sLen := len(s)
 
 	if sLen < 10 || s[4] != '-' || s[7] != '-' {
@@ -34,7 +34,7 @@ func parse(s []byte) (time.Time, error) {
 	}
 
 	if sLen == 10 {
-		unix := toUnix(year, time.Month(month), day, 0, 0, 0)
+		unix := toUnixUTC(year, time.Month(month), day, 0, 0, 0) - int64(locOffset)
 		return time.Unix(unix, 0), nil
 	}
 
@@ -49,52 +49,55 @@ func parse(s []byte) (time.Time, error) {
 		return time.Time{}, errParse
 	}
 
-	var nsec, tzSign, tzH, tzM, tzIdx, tz int
+	var nsec, tzSign, tzH, tzM, tzIdx, tzOffset int
 
 	// nsec
-	tzIdx = 19
-	if sLen > 20 {
-		if s[19] == '.' || s[19] == ',' {
-			// fast path
+	s = s[19:]
+	sLen = len(s)
+	tzIdx = 0
+	if sLen > 1 {
+		// .123+08:00
+		if s[0] == '.' || s[0] == ',' {
+			// Try fast path.
 			switch {
-			case sLen > 23 && (s[23] == '+' || s[23] == '-' || s[23] == 'z' || s[23] == 'Z'):
-				nsec = atoi3(s[20:23]) * 1e6
-				tzIdx = 23
-			case sLen > 26 && (s[26] == '+' || s[26] == '-' || s[26] == 'z' || s[26] == 'Z'):
-				nsec = atoi6(s[20:26]) * 1e3
-				tzIdx = 26
-			case sLen > 29 && (s[29] == '+' || s[29] == '-' || s[29] == 'z' || s[29] == 'Z'):
-				nsec = atoi9(s[20:29])
-				tzIdx = 29
-			case sLen > 21 && (s[21] == '+' || s[21] == '-' || s[21] == 'z' || s[21] == 'Z'):
-				nsec = atoi1(s[20:21]) * 1e8
-				tzIdx = 21
-			case sLen > 22 && (s[22] == '+' || s[22] == '-' || s[22] == 'z' || s[22] == 'Z'):
-				nsec = atoi2(s[20:22]) * 1e7
-				tzIdx = 22
-			case sLen > 24 && (s[24] == '+' || s[24] == '-' || s[24] == 'z' || s[24] == 'Z'):
-				nsec = atoi4(s[20:24]) * 1e5
-				tzIdx = 24
-			case sLen > 25 && (s[25] == '+' || s[25] == '-' || s[25] == 'z' || s[25] == 'Z'):
-				nsec = atoi5(s[20:25]) * 1e4
-				tzIdx = 25
-			case sLen > 27 && (s[27] == '+' || s[27] == '-' || s[27] == 'z' || s[27] == 'Z'):
-				nsec = atoi7(s[20:27]) * 1e2
-				tzIdx = 27
-			case sLen > 28 && (s[28] == '+' || s[28] == '-' || s[28] == 'z' || s[28] == 'Z'):
-				nsec = atoi8(s[20:28]) * 1e1
-				tzIdx = 28
+			case sLen > 4 && (s[4] == '+' || s[4] == '-' || s[4] == 'z' || s[4] == 'Z'):
+				nsec = atoi3(s[1:4]) * 1e6
+				tzIdx = 4
+			case sLen > 7 && (s[7] == '+' || s[7] == '-' || s[7] == 'z' || s[7] == 'Z'):
+				nsec = atoi6(s[1:7]) * 1e3
+				tzIdx = 7
+			case sLen > 10 && (s[10] == '+' || s[10] == '-' || s[10] == 'z' || s[10] == 'Z'):
+				nsec = atoi9(s[1:10])
+				tzIdx = 10
+			case sLen > 2 && (s[2] == '+' || s[2] == '-' || s[2] == 'z' || s[2] == 'Z'):
+				nsec = atoi1(s[1:2]) * 1e8
+				tzIdx = 2
+			case sLen > 3 && (s[3] == '+' || s[3] == '-' || s[3] == 'z' || s[3] == 'Z'):
+				nsec = atoi2(s[1:3]) * 1e7
+				tzIdx = 3
+			case sLen > 5 && (s[5] == '+' || s[5] == '-' || s[5] == 'z' || s[5] == 'Z'):
+				nsec = atoi4(s[1:5]) * 1e5
+				tzIdx = 5
+			case sLen > 6 && (s[6] == '+' || s[6] == '-' || s[6] == 'z' || s[6] == 'Z'):
+				nsec = atoi5(s[1:6]) * 1e4
+				tzIdx = 6
+			case sLen > 8 && (s[8] == '+' || s[8] == '-' || s[8] == 'z' || s[8] == 'Z'):
+				nsec = atoi7(s[1:8]) * 1e2
+				tzIdx = 8
+			case sLen > 9 && (s[9] == '+' || s[9] == '-' || s[9] == 'z' || s[9] == 'Z'):
+				nsec = atoi8(s[1:9]) * 1e1
+				tzIdx = 9
 			default:
 				nsec = -1
 			}
 
-			// fallback
-			if nsec < 0 && '0' <= s[20] && s[20] <= '9' {
+			// Fallback
+			if nsec < 0 && '0' <= s[1] && s[1] <= '9' {
 				var val int
 				var c byte
 				var mult int = 1e9
-				for tzIdx = 20; tzIdx < sLen; tzIdx++ {
-					if tzIdx > 28 {
+				for tzIdx = 1; tzIdx < sLen; tzIdx++ {
+					if tzIdx > 10 {
 						return time.Time{}, errParse
 					}
 
@@ -108,14 +111,20 @@ func parse(s []byte) (time.Time, error) {
 				}
 				nsec = val * mult
 			}
-		} else if s[19] != 'z' && s[19] != 'Z' && s[19] != '+' && s[19] != '-' {
+		} else if s[0] != 'z' && s[0] != 'Z' && s[0] != '+' && s[0] != '-' {
 			return time.Time{}, errParse
 		}
 	}
 
-	// tzSign
+	if sLen == 0 || sLen == tzIdx {
+		// No tz information.
+		unix := toUnixUTC(year, time.Month(month), day, hour, min, sec) - int64(locOffset)
+		return time.Unix(unix, int64(nsec)), nil
+	}
+
+	// Timezone sign.
 	switch {
-	case sLen == 19 || sLen == tzIdx:
+	case sLen == 0 || sLen == tzIdx:
 		tzSign = 1
 	case s[sLen-1] == 'z' || s[sLen-1] == 'Z' || s[tzIdx] == '+':
 		tzSign = 1
@@ -125,12 +134,12 @@ func parse(s []byte) (time.Time, error) {
 		tzSign = 0
 	}
 
-	// tzH, tzM
+	// Timezone hour and minute.
 	s = s[tzIdx:]
 	if len(s) > 0 {
 		c := s[0]
 		if c == 'z' || c == 'Z' {
-			tz = 0
+			tzOffset = 0
 		} else {
 			if c != '+' && c != '-' {
 				return time.Time{}, errParse
@@ -165,13 +174,13 @@ func parse(s []byte) (time.Time, error) {
 		return time.Time{}, errParse
 	}
 
-	tz = tzSign * (tzH*3600 + tzM*60)
+	tzOffset = tzSign * (tzH*3600 + tzM*60)
 
-	unix := toUnix(year, time.Month(month), day, hour, min, sec) - int64(tz)
+	unix := toUnixUTC(year, time.Month(month), day, hour, min, sec) - int64(tzOffset)
 	return time.Unix(unix, int64(nsec)), nil
 }
 
-func toUnix(year int, month time.Month, day, hour, min, sec int) int64 {
+func toUnixUTC(year int, month time.Month, day, hour, min, sec int) int64 {
 	// Compute days since the absolute epoch.
 	d := daysSinceEpoch(year)
 
