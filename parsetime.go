@@ -38,7 +38,41 @@ func parse(s []byte) (time.Time, error) {
 	// nsec
 	tzIdx = 19
 	if sLen > 20 && (s[19] == '.' || s[19] == ',') {
-		if '0' <= s[20] && s[20] <= '9' {
+		// fast path
+		switch {
+		case sLen > 22 && (s[23] == '+' || s[23] == '-' || s[23] == 'z' || s[23] == 'Z'):
+			nsec = atoi3(s[20:23]) * 1e6
+			tzIdx = 23
+		case sLen > 25 && (s[26] == '+' || s[26] == '-' || s[26] == 'z' || s[26] == 'Z'):
+			nsec = atoi6(s[20:26]) * 1e3
+			tzIdx = 26
+		case sLen > 28 && (s[29] == '+' || s[29] == '-' || s[29] == 'z' || s[29] == 'Z'):
+			nsec = atoi9(s[20:29])
+			tzIdx = 29
+		case sLen > 20 && (s[21] == '+' || s[21] == '-' || s[21] == 'z' || s[21] == 'Z'):
+			nsec = atoi1(s[20:21]) * 1e8
+			tzIdx = 21
+		case sLen > 21 && (s[22] == '+' || s[22] == '-' || s[22] == 'z' || s[22] == 'Z'):
+			nsec = atoi2(s[20:22]) * 1e6
+			tzIdx = 22
+		case sLen > 23 && (s[24] == '+' || s[24] == '-' || s[24] == 'z' || s[24] == 'Z'):
+			nsec = atoi4(s[20:24]) * 1e5
+			tzIdx = 24
+		case sLen > 24 && (s[25] == '+' || s[25] == '-' || s[25] == 'z' || s[25] == 'Z'):
+			nsec = atoi5(s[20:25]) * 1e4
+			tzIdx = 25
+		case sLen > 26 && (s[27] == '+' || s[27] == '-' || s[27] == 'z' || s[27] == 'Z'):
+			nsec = atoi7(s[20:27]) * 1e2
+			tzIdx = 27
+		case sLen > 27 && (s[28] == '+' || s[28] == '-' || s[28] == 'z' || s[28] == 'Z'):
+			nsec = atoi8(s[20:28]) * 1e1
+			tzIdx = 28
+		default:
+			nsec = -1
+		}
+
+		// fallback
+		if nsec == -1 && '0' <= s[20] && s[20] <= '9' {
 			var val int
 			var c byte
 			var mult int = 1e9
@@ -106,13 +140,106 @@ func atoi2MinMax(s []byte, min, max int) (x int) {
 	return x
 }
 
+func atoi1(s []byte) (x int) {
+	_ = s[0]
+	a0 := int(s[0] - '0')
+	if a0 < 0 || a0 > 9 {
+		return -1
+	}
+	return a0 * 1
+}
+
+func atoi2(s []byte) (x int) {
+	_ = s[1]
+	a0, a1 := int(s[0]-'0'), int(s[1]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
+		return -1
+	}
+	return a0*1e1 + a1*1
+}
+
+func atoi3(s []byte) (x int) {
+	_ = s[2]
+	a0, a1, a2 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 {
+		return -1
+	}
+	return a0*1e2 + a1*1e1 + a2*1
+}
+
 func atoi4(s []byte) (x int) {
+	_ = s[3]
 	a0, a1, a2, a3 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
 	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 {
 		return -1
 	}
-	x = a0*1e3 + a1*1e2 + a2*1e1 + a3
-	return x
+	return a0*1e3 + a1*1e2 + a2*1e1 + a3*1
+}
+
+func atoi5(s []byte) (x int) {
+	_ = s[4]
+	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
+		return -1
+	}
+
+	return a0*1e4 + a1*1e3 + a2*1e2 + a3*1e1 + a4*1
+}
+
+func atoi6(s []byte) (x int) {
+	_ = s[5]
+	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
+		return -1
+	}
+	a5 := int(s[5] - '0')
+	if a5 < 0 || a5 > 9 {
+		return -1
+	}
+
+	return a0*1e5 + a1*1e4 + a2*1e3 + a3*1e2 + a4*1e1 + a5*1
+}
+
+func atoi7(s []byte) (x int) {
+	_ = s[6]
+	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
+		return -1
+	}
+	a5, a6 := int(s[5]-'0'), int(s[6]-'0')
+	if a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 {
+		return -1
+	}
+
+	return a0*1e6 + a1*1e5 + a2*1e4 + a3*1e3 + a4*1e2 + a5*1e1 + a6*1
+}
+
+func atoi8(s []byte) (x int) {
+	_ = s[7]
+	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
+		return -1
+	}
+	a5, a6, a7 := int(s[5]-'0'), int(s[6]-'0'), int(s[7]-'0')
+	if a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 {
+		return -1
+	}
+
+	return a0*1e7 + a1*1e6 + a2*1e5 + a3*1e4 + a4*1e3 + a5*1e2 + a6*1e1 + a7*1
+}
+
+func atoi9(s []byte) (x int) {
+	_ = s[8]
+	a0, a1, a2, a3, a4 := int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
+	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
+		return -1
+	}
+	a5, a6, a7, a8 := int(s[5]-'0'), int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0')
+	if a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 || a8 < 0 || a8 > 9 {
+		return -1
+	}
+
+	return a0*1e8 + a1*1e7 + a2*1e6 + a3*1e5 + a4*1e4 + a5*1e3 + a6*1e2 + a7*1e1 + a8*1
 }
 
 // The following code is almost from the stdlib time.
