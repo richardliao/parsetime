@@ -17,51 +17,80 @@ func Parse(s string) (time.Time, error) {
 }
 
 func parse(s []byte) (time.Time, error) {
-	ok := true
-
-	// Parse the date and time.
-	if len(s) < len("2006-01-02T15:04:05") {
+	if len(s) < 19 || s[4] != '-' || s[7] != '-' || s[13] != ':' || s[16] != ':' || s[10] != 'T' && s[10] != ' ' {
 		return time.Time{}, errParse
 	}
-	year := atoi4(s[0:4])                                           // e.g., 2006
-	month := atoi2MinMax(s[5:7], 1, 12)                             // e.g., 01
-	day := atoi2MinMax(s[8:10], 1, daysIn(time.Month(month), year)) // e.g., 02
-	hour := atoi2MinMax(s[11:13], 0, 23)                            // e.g., 15
-	min := atoi2MinMax(s[14:16], 0, 59)                             // e.g., 04
-	sec := atoi2MinMax(s[17:19], 0, 59)                             // e.g., 05
-	if !ok || !(s[4] == '-' && s[7] == '-' && s[10] == 'T' && s[13] == ':' && s[16] == ':') {
+
+	var nsec, tzSign, tzH, tzM, tzIdx, tzOffset int
+
+	sLen := len(s)
+
+	year := atoi4(s[0:4])
+	month := atoi2MinMax(s[5:7], 1, 12)
+	day := atoi2MinMax(s[8:10], 1, daysIn(time.Month(month), year))
+	hour := atoi2MinMax(s[11:13], 0, 23)
+	min := atoi2MinMax(s[14:16], 0, 59)
+	sec := atoi2MinMax(s[17:19], 0, 59)
+	if year == -1 || month == -1 || day == -1 || hour == -1 || min == -1 || sec == -1 {
 		return time.Time{}, errParse
 	}
-	s = s[19:]
 
-	// Parse the fractional second.
-	var nsec int
-	if len(s) >= 2 && s[0] == '.' && isDigit(s, 1) {
-		n := 2
-		for ; n < len(s) && isDigit(s, n); n++ {
+	// nsec
+	tzIdx = 19
+	if sLen > 20 && (s[19] == '.' || s[19] == ',') {
+		if '0' <= s[20] && s[20] <= '9' {
+			var val int
+			var c byte
+			var mult int = 1e9
+			for tzIdx = 20; tzIdx < sLen; tzIdx++ {
+				c = s[tzIdx]
+				if c >= '0' && c <= '9' {
+					val = val*10 + int(c-'0')
+					mult /= 10
+				} else {
+					break
+				}
+			}
+			nsec = val * mult
 		}
-		nsec, _, _ = parseNanoseconds(s, n)
-		s = s[n:]
 	}
 
-	// Parse the time zone.
-	t := time.Date(year, time.Month(month), day, hour, min, sec, nsec, time.UTC)
-	if len(s) != 1 || s[0] != 'Z' {
-		if len(s) != len("-07:00") {
+	// tzH, tzM
+	if tzH == -1 || tzM == -1 {
+		if s[tzIdx] != '+' && s[tzIdx] != '-' {
 			return time.Time{}, errParse
-		}
-		hr := atoi2MinMax(s[1:3], 0, 23) // e.g., 07
-		mm := atoi2MinMax(s[4:6], 0, 59) // e.g., 00
-		if !ok || !((s[0] == '-' || s[0] == '+') && s[3] == ':') {
-			return time.Time{}, errParse
-		}
-		zoneOffset := (hr*60 + mm) * 60
-		if s[0] == '-' {
-			zoneOffset *= -1
 		}
 
-		t = t.Add(-time.Duration(zoneOffset) * time.Second)
+		tzH = atoi2MinMax(s[tzIdx+1:tzIdx+3], 0, 23)
+
+		tzmIdx := 3
+		if s[tzIdx+3] == ':' {
+			tzmIdx++
+		}
+
+		tzM = atoi2MinMax(s[tzIdx+tzmIdx:tzIdx+tzmIdx+2], 0, 59)
 	}
+
+	// tzSign
+	switch {
+	case s[sLen-6] == '+' || s[sLen-5] == '+':
+		tzSign = 1
+	case s[sLen-6] == '-' || s[sLen-5] == '-':
+		tzSign = -1
+	case s[sLen-1] == 'z' || s[sLen-1] == 'Z':
+		tzSign = 1
+	default:
+		tzSign = 0
+	}
+
+	if nsec == -1 || tzH == -1 || tzM == -1 || tzSign == 0 {
+		return time.Time{}, errParse
+	}
+
+	tzOffset = tzSign * (tzH*3600 + tzM*60)
+
+	t := time.Date(year, time.Month(month), day, hour, min, sec, nsec, time.Local)
+	t = t.Add(-time.Duration(tzOffset) * time.Second)
 	return t, nil
 }
 
