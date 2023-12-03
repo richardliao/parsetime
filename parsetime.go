@@ -61,10 +61,10 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 	var unix int64
 	var a0, a1, a2, a3, a4, a5, a6, a7, a8 int
 
-	a0, a1, a2, a3 = int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
-	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 {
+	if notDigi(s[0]) || notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) {
 		return time.Time{}, errParse
 	}
+	a0, a1, a2, a3 = int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
 	year := a0*1e3 + a1*1e2 + a2*1e1 + a3
 	month := atoi2MinMax(s[5:7], 1, 12)
 	if year == -1 || month == -1 {
@@ -114,83 +114,82 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 	sLen = len(s)
 	tzIdx = 0
 	if sLen > 1 {
-		// .123+08:00
 		if s[0] == '.' || s[0] == ',' {
 			// Try fast path.
 			switch {
 			case sLen > 4 && (s[4] == '+' || s[4] == '-' || s[4] == 'z' || s[4] == 'Z'):
-				a0, a1, a2 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) {
 					nsec = -1
 				} else {
+					a0, a1, a2 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
 					nsec = (a0*1e2 + a1*1e1 + a2) * 1e6
 					tzIdx = 4
 				}
 			case sLen > 7 && (s[7] == '+' || s[7] == '-' || s[7] == 'z' || s[7] == 'Z'):
-				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
-				a5 = int(s[6] - '0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) {
 					nsec = -1
 				} else {
+					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+					a5 = int(s[6] - '0')
 					nsec = (a0*1e5 + a1*1e4 + a2*1e3 + a3*1e2 + a4*1e1 + a5) * 1e3
 					tzIdx = 7
 				}
 			case sLen > 10 && (s[10] == '+' || s[10] == '-' || s[10] == 'z' || s[10] == 'Z'):
-				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
-				a5, a6, a7, a8 = int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0'), int(s[9]-'0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 || a8 < 0 || a8 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) || notDigi(s[7]) || notDigi(s[8]) || notDigi(s[9]) {
 					nsec = -1
 				} else {
+					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+					a5, a6, a7, a8 = int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0'), int(s[9]-'0')
 					nsec = a0*1e8 + a1*1e7 + a2*1e6 + a3*1e5 + a4*1e4 + a5*1e3 + a6*1e2 + a7*1e1 + a8
 					tzIdx = 10
 				}
 			case sLen > 2 && (s[2] == '+' || s[2] == '-' || s[2] == 'z' || s[2] == 'Z'):
-				a0 = int(s[1] - '0')
-				if a0 < 0 || a0 > 9 {
+				if notDigi(s[1]) {
 					nsec = -1
 				} else {
+					a0 = int(s[1] - '0')
 					nsec = (a0) * 1e8
 					tzIdx = 2
 				}
 			case sLen > 3 && (s[3] == '+' || s[3] == '-' || s[3] == 'z' || s[3] == 'Z'):
-				a0, a1 = int(s[1]-'0'), int(s[2]-'0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) {
 					nsec = -1
 				} else {
+					a0, a1 = int(s[1]-'0'), int(s[2]-'0')
 					nsec = (a0*1e1 + a1) * 1e7
 					tzIdx = 3
 				}
 			case sLen > 5 && (s[5] == '+' || s[5] == '-' || s[5] == 'z' || s[5] == 'Z'):
-				a0, a1, a2, a3 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) {
 					nsec = -1
 				} else {
+					a0, a1, a2, a3 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
 					nsec = (a0*1e3 + a1*1e2 + a2*1e1 + a3) * 1e5
 					tzIdx = 5
 				}
 			case sLen > 6 && (s[6] == '+' || s[6] == '-' || s[6] == 'z' || s[6] == 'Z'):
-				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) {
 					nsec = -1
 				} else {
+					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
 					nsec = (a0*1e4 + a1*1e3 + a2*1e2 + a3*1e1 + a4) * 1e4
 					tzIdx = 6
 				}
 			case sLen > 8 && (s[8] == '+' || s[8] == '-' || s[8] == 'z' || s[8] == 'Z'):
-				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
-				a5, a6 = int(s[6]-'0'), int(s[7]-'0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) || notDigi(s[7]) {
 					nsec = -1
 				} else {
+					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+					a5, a6 = int(s[6]-'0'), int(s[7]-'0')
 					nsec = (a0*1e6 + a1*1e5 + a2*1e4 + a3*1e3 + a4*1e2 + a5*1e1 + a6) * 1e2
 					tzIdx = 8
 				}
 			case sLen > 9 && (s[9] == '+' || s[9] == '-' || s[9] == 'z' || s[9] == 'Z'):
-				a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
-				a5, a6, a7 = int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0')
-				if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 || a2 < 0 || a2 > 9 || a3 < 0 || a3 > 9 || a4 < 0 || a4 > 9 || a5 < 0 || a5 > 9 || a6 < 0 || a6 > 9 || a7 < 0 || a7 > 9 {
+				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) || notDigi(s[7]) || notDigi(s[8]) {
 					nsec = -1
 				} else {
+					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
+					a5, a6, a7 = int(s[6]-'0'), int(s[7]-'0'), int(s[8]-'0')
 					nsec = (a0*1e7 + a1*1e6 + a2*1e5 + a3*1e4 + a4*1e3 + a5*1e2 + a6*1e1 + a7) * 1e1
 					tzIdx = 9
 				}
@@ -298,6 +297,10 @@ func atoi2MinMax(s []byte, min, max int) (x int) {
 		return -1
 	}
 	return x
+}
+
+func notDigi(c byte) bool {
+	return c < '0' || c > '9'
 }
 
 // The following code is from the stdlib time.
