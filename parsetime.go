@@ -61,7 +61,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 	var unix int64
 	var a0, a1, a2, a3, a4, a5, a6, a7, a8 int
 
-	if notDigi(s[0]) || notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) {
+	if nd(s[0]) || nd(s[1]) || nd(s[2]) || nd(s[3]) {
 		return time.Time{}, errParse
 	}
 	a0, a1, a2, a3 = int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
@@ -118,7 +118,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 			// Try fast path.
 			switch {
 			case sLen > 4 && (s[4] == '+' || s[4] == '-' || s[4] == 'z' || s[4] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) {
+				if nd(s[1]) || nd(s[2]) || nd(s[3]) {
 					nsec = -1
 				} else {
 					a0, a1, a2 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
@@ -126,7 +126,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 4
 				}
 			case sLen > 7 && (s[7] == '+' || s[7] == '-' || s[7] == 'z' || s[7] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) {
+				if nd(s[1]) || nd(s[2]) || nd(s[3]) || nd(s[4]) || nd(s[5]) || nd(s[6]) {
 					nsec = -1
 				} else {
 					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
@@ -135,7 +135,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 7
 				}
 			case sLen > 10 && (s[10] == '+' || s[10] == '-' || s[10] == 'z' || s[10] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) || notDigi(s[7]) || notDigi(s[8]) || notDigi(s[9]) {
+				if nd(s[1]) || nd(s[2]) || nd(s[3]) || nd(s[4]) || nd(s[5]) || nd(s[6]) || nd(s[7]) || nd(s[8]) || nd(s[9]) {
 					nsec = -1
 				} else {
 					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
@@ -144,7 +144,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 10
 				}
 			case sLen > 2 && (s[2] == '+' || s[2] == '-' || s[2] == 'z' || s[2] == 'Z'):
-				if notDigi(s[1]) {
+				if nd(s[1]) {
 					nsec = -1
 				} else {
 					a0 = int(s[1] - '0')
@@ -152,7 +152,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 2
 				}
 			case sLen > 3 && (s[3] == '+' || s[3] == '-' || s[3] == 'z' || s[3] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) {
+				if nd(s[1]) || nd(s[2]) {
 					nsec = -1
 				} else {
 					a0, a1 = int(s[1]-'0'), int(s[2]-'0')
@@ -160,7 +160,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 3
 				}
 			case sLen > 5 && (s[5] == '+' || s[5] == '-' || s[5] == 'z' || s[5] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) {
+				if nd(s[1]) || nd(s[2]) || nd(s[3]) || nd(s[4]) {
 					nsec = -1
 				} else {
 					a0, a1, a2, a3 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0')
@@ -168,7 +168,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 5
 				}
 			case sLen > 6 && (s[6] == '+' || s[6] == '-' || s[6] == 'z' || s[6] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) {
+				if nd(s[1]) || nd(s[2]) || nd(s[3]) || nd(s[4]) || nd(s[5]) {
 					nsec = -1
 				} else {
 					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
@@ -176,7 +176,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 6
 				}
 			case sLen > 8 && (s[8] == '+' || s[8] == '-' || s[8] == 'z' || s[8] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) || notDigi(s[7]) {
+				if nd(s[1]) || nd(s[2]) || nd(s[3]) || nd(s[4]) || nd(s[5]) || nd(s[6]) || nd(s[7]) {
 					nsec = -1
 				} else {
 					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
@@ -185,7 +185,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 					tzIdx = 8
 				}
 			case sLen > 9 && (s[9] == '+' || s[9] == '-' || s[9] == 'z' || s[9] == 'Z'):
-				if notDigi(s[1]) || notDigi(s[2]) || notDigi(s[3]) || notDigi(s[4]) || notDigi(s[5]) || notDigi(s[6]) || notDigi(s[7]) || notDigi(s[8]) {
+				if nd(s[1]) || nd(s[2]) || nd(s[3]) || nd(s[4]) || nd(s[5]) || nd(s[6]) || nd(s[7]) || nd(s[8]) {
 					nsec = -1
 				} else {
 					a0, a1, a2, a3, a4 = int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0'), int(s[4]-'0'), int(s[5]-'0')
@@ -299,7 +299,7 @@ func atoi2MinMax(s []byte, min, max int) (x int) {
 	return x
 }
 
-func notDigi(c byte) bool {
+func nd(c byte) bool {
 	return c < '0' || c > '9'
 }
 
