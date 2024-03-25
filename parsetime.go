@@ -67,10 +67,17 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 	a0, a1, a2, a3 = int(s[0]-'0'), int(s[1]-'0'), int(s[2]-'0'), int(s[3]-'0')
 	year := a0*1e3 + a1*1e2 + a2*1e1 + a3
 	month := atoi2MinMax(s[5:7], 1, 12)
-	if year == -1 || month == -1 {
+	if year == -1 || month < 1 || month > 12 {
 		return time.Time{}, errParse
 	}
-	day := atoi2MinMax(s[8:10], 1, daysIn(time.Month(month), year))
+
+	// daysIn
+	daysIn := int(daysBefore[month] - daysBefore[month-1])
+	if month == 2 && isLeap(year) {
+		daysIn = 29
+	}
+
+	day := atoi2MinMax(s[8:10], 1, daysIn)
 	if day == -1 {
 		return time.Time{}, errParse
 	}
@@ -79,7 +86,7 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 	var daysEpoc uint64
 	var leap bool
 
-	if year >= unixEpoc && year < unixEpoc+cacheYears {
+	if year >= unixEpoc && year < unixEpoc+cacheYears && 0 <= month && month < 12 {
 		daysEpoc = yearDays[year-unixEpoc] + uint64(daysBefore[month-1]) + uint64(day-1)
 		leap = yearLeap[year-unixEpoc]
 	} else {
@@ -229,6 +236,10 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 	}
 
 	// Timezone sign.
+	if tzIdx < 0 || tzIdx >= sLen {
+		return time.Time{}, errParse
+	}
+
 	switch {
 	case sLen == 0 || sLen == tzIdx:
 		tzSign = 1
@@ -287,7 +298,10 @@ func parse(s []byte, locOffset int) (time.Time, error) {
 }
 
 func atoi2MinMax(s []byte, min, max int) (x int) {
-	_ = s[1]
+	if len(s) != 2 {
+		return -1
+	}
+
 	a0, a1 := int(s[0]-'0'), int(s[1]-'0')
 	if a0 < 0 || a0 > 9 || a1 < 0 || a1 > 9 {
 		return -1
@@ -378,13 +392,6 @@ var daysBefore = [...]int32{
 
 func isLeap(year int) bool {
 	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
-}
-
-func daysIn(m time.Month, year int) int {
-	if m == time.February && isLeap(year) {
-		return 29
-	}
-	return int(daysBefore[m] - daysBefore[m-1])
 }
 
 // Cache between 1970 and 2069.
